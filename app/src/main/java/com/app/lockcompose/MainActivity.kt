@@ -13,8 +13,6 @@ import com.app.lockcompose.ui.theme.LockComposeTheme
 
 class MainActivity : ComponentActivity() {
 
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

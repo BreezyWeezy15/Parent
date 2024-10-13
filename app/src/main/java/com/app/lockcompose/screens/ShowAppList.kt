@@ -1,6 +1,6 @@
 
 
-import android.content.ContentValues
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ResolveInfo
@@ -9,7 +9,6 @@ import android.graphics.Canvas
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.os.Build
 import android.util.Base64
 import android.widget.Toast
@@ -70,22 +69,23 @@ import com.google.firebase.database.FirebaseDatabase
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 
+@SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShowAppList() {
     val context = LocalContext.current
 
-    // List of installed apps
+
     val allApps = remember { getInstalledApps(context) }
     val availableApps by remember { mutableStateOf(allApps.toMutableList()) }
     val selectedApps = remember { mutableStateListOf<InstalledApp>() }
 
-    // Time intervals for the dropdown menu
+
     var expanded by remember { mutableStateOf(false) }
     var selectedInterval by remember { mutableStateOf("Select Interval") }
     val timeIntervals = listOf("1 min", "15 min", "30 min", "45 min", "60 min", "75 min", "90 min", "120 min")
 
-    // PIN code input field
+
     var pinCode by remember { mutableStateOf("") }
 
 
@@ -112,7 +112,6 @@ fun ShowAppList() {
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Time Interval Picker (Fixed Dropdown Menu)
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded },
@@ -208,7 +207,8 @@ fun ShowAppList() {
     }
 }
 
-// Helper function to convert Drawable to ByteArray
+
+@SuppressLint("NewApi")
 fun drawableToByteArray(drawable: Drawable): ByteArray {
     val bitmap = when (drawable) {
         is BitmapDrawable -> drawable.bitmap
@@ -231,14 +231,12 @@ fun drawableToByteArray(drawable: Drawable): ByteArray {
     return stream.toByteArray()
 }
 
-// InstalledApp data class
 data class InstalledApp(
     val packageName: String,
     val name: String,
     val icon: Drawable?
 )
 
-// Fetch installed apps from the device
 fun getInstalledApps(context: Context): List<InstalledApp> {
     val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
         addCategory(Intent.CATEGORY_LAUNCHER)
@@ -253,13 +251,8 @@ fun getInstalledApps(context: Context): List<InstalledApp> {
     }
 }
 
-// Composable for rendering each app in the list
 @Composable
-fun AppListItem(
-    app: InstalledApp,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
+fun AppListItem(app: InstalledApp, isSelected: Boolean, onClick: () -> Unit) {
     val iconPainter = rememberDrawablePainter(app.icon)
 
     val borderModifier = if (isSelected) {
@@ -299,7 +292,6 @@ fun AppListItem(
     }
 }
 
-// Remember a Drawable painter for app icons
 @Composable
 fun rememberDrawablePainter(drawable: Drawable?): Painter {
     return remember(drawable) {
@@ -334,8 +326,7 @@ fun sendSelectedAppsToFirebase(selectedApps: List<InstalledApp>, selectedInterva
             "icon" to iconByteArray?.let { Base64.encodeToString(it, Base64.DEFAULT) }
         )
 
-        // Upload each selected app's data to Firebase
-        firebaseDatabase.child(app.name.toLowerCase(Locale.ROOT)).setValue(appData)
+        firebaseDatabase.child(app.name.lowercase(Locale.ROOT)).setValue(appData)
             .addOnSuccessListener {
                 Toast.makeText(context, "uploaded successfully", Toast.LENGTH_SHORT).show()
             }
