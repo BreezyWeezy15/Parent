@@ -9,13 +9,13 @@ import android.graphics.Canvas
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.util.Base64
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,10 +41,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -69,38 +72,59 @@ import com.google.firebase.database.FirebaseDatabase
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 
-@SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShowAppList() {
     val context = LocalContext.current
 
-
+    val isLightTheme = !isSystemInDarkTheme()
     val allApps = remember { getInstalledApps(context) }
     val availableApps by remember { mutableStateOf(allApps.toMutableList()) }
     val selectedApps = remember { mutableStateListOf<InstalledApp>() }
-
 
     var expanded by remember { mutableStateOf(false) }
     var selectedInterval by remember { mutableStateOf("Select Interval") }
     val timeIntervals = listOf("1 min", "15 min", "30 min", "45 min", "60 min", "75 min", "90 min", "120 min")
 
-
     var pinCode by remember { mutableStateOf("") }
-
 
     fun parseInterval(interval: String): Int {
         return interval.replace(" min", "").toIntOrNull() ?: 0
     }
 
-
+    // Function to delete all apps from Firebase
+    fun deleteAllAppsFromFirebase() {
+        val firebaseDatabase = FirebaseDatabase.getInstance().reference.child("Apps")
+        firebaseDatabase.removeValue().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Toast.makeText(context, "All apps deleted", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Failed to delete apps", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("》Rules list") },
+                actions = {
+                    IconButton(onClick = {
+                        if (availableApps.isEmpty()) {
+                            Toast.makeText(context, "No apps to delete", Toast.LENGTH_SHORT).show()
+                        } else {
+                            deleteAllAppsFromFirebase()
+                            availableApps.clear()  // Clear the list locally
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Apps"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFE0E0E0)
+                    containerColor = if (isLightTheme) Color(0xFFE0E0E0) else Color.DarkGray
                 )
             )
         }
@@ -108,14 +132,15 @@ fun ShowAppList() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(if (isLightTheme) Color.White else Color(0xFF303030))
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
+            // Spinner for time interval - Full width
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth() // Full width for the dropdown menu
             ) {
                 TextField(
                     value = selectedInterval,
@@ -129,15 +154,20 @@ fun ShowAppList() {
                         )
                     },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+                        .fillMaxWidth() // Ensures TextField takes full width
+                        .menuAnchor(),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = if (isLightTheme) Color.White else Color(0xFF424242),
+                        focusedLabelColor = if (isLightTheme) Color.Black else Color.White,
+                        unfocusedLabelColor = if (isLightTheme) Color.Black else Color.White
+                    )
                 )
 
                 ExposedDropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth() // Ensures the dropdown menu is full width
                         .heightIn(max = 200.dp)
                 ) {
                     timeIntervals.forEach { interval ->
@@ -152,18 +182,18 @@ fun ShowAppList() {
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp)) // Space between spinner and list
+
+            // LazyColumn for the list of apps
             LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(15.dp)
+                modifier = Modifier.weight(1f) // Allow the list to take remaining space
             ) {
                 items(availableApps) { app ->
-                    val isSelected = selectedApps.contains(app)
                     AppListItem(
                         app = app,
-                        isSelected = isSelected,
+                        isSelected = selectedApps.contains(app),
                         onClick = {
-                            if (isSelected) {
+                            if (selectedApps.contains(app)) {
                                 selectedApps.remove(app)
                             } else {
                                 selectedApps.add(app)
@@ -181,14 +211,22 @@ fun ShowAppList() {
                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp)
+                    .padding(vertical = 16.dp),
+                colors = TextFieldDefaults.textFieldColors(
+                    containerColor = if (isLightTheme) Color.White else Color(0xFF424242),
+                    focusedLabelColor = if (isLightTheme) Color.Black else Color.White,
+                    unfocusedLabelColor = if (isLightTheme) Color.Black else Color.White,
+                    focusedTextColor = if (isLightTheme) Color.Black else Color.White,
+                    unfocusedTextColor = if (isLightTheme) Color.Black else Color.White,
+                )
             )
 
+            // Button at the bottom
             Button(
                 onClick = {
                     if (pinCode.isNotEmpty() && selectedApps.isNotEmpty() && selectedInterval != "Select Interval") {
                         val intervalInMinutes = parseInterval(selectedInterval)
-                        sendSelectedAppsToFirebase(selectedApps, intervalInMinutes, pinCode,context)
+                        sendSelectedAppsToFirebase(selectedApps, intervalInMinutes, pinCode, context)
                     } else {
                         Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                     }
@@ -196,16 +234,19 @@ fun ShowAppList() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3F51B5)), // Indigo color
+                shape = RoundedCornerShape(0.dp) // No corners
             ) {
                 Text(
-                    text = "Send to Another App",
+                    text = "Send Rules",
                     color = Color.White
                 )
             }
         }
     }
 }
+
+
 
 
 @SuppressLint("NewApi")
@@ -286,7 +327,7 @@ fun AppListItem(app: InstalledApp, isSelected: Boolean, onClick: () -> Unit) {
                 modifier = Modifier
                     .padding(start = 8.dp)
                     .weight(1f),
-                color = Color.Black
+                color = if (isSystemInDarkTheme()) Color.White else Color.Black
             )
         }
     }
@@ -295,20 +336,8 @@ fun AppListItem(app: InstalledApp, isSelected: Boolean, onClick: () -> Unit) {
 @Composable
 fun rememberDrawablePainter(drawable: Drawable?): Painter {
     return remember(drawable) {
-        if (drawable != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && drawable is AdaptiveIconDrawable) {
-                val bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
-                drawable.setBounds(0, 0, canvas.width, canvas.height)
-                drawable.draw(canvas)
-                BitmapPainter(bitmap.asImageBitmap())
-            } else {
-                val bitmap = drawable.toBitmap()
-                BitmapPainter(bitmap.asImageBitmap())
-            }
-        } else {
-            BitmapPainter(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).asImageBitmap())
-        }
+        val bitmap = drawable?.toBitmap(100, 100) ?: Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        BitmapPainter(bitmap.asImageBitmap())
     }
 }
 
