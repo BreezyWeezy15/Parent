@@ -247,8 +247,6 @@ fun ShowAppList() {
 }
 
 
-
-
 @SuppressLint("NewApi")
 fun drawableToByteArray(drawable: Drawable): ByteArray {
     val bitmap = when (drawable) {
@@ -345,22 +343,34 @@ fun sendSelectedAppsToFirebase(selectedApps: List<InstalledApp>, selectedInterva
     val firebaseDatabase = FirebaseDatabase.getInstance().reference.child("Apps")
 
     selectedApps.forEach { app ->
-        val iconByteArray = app.icon?.let { drawableToByteArray(it) }
+        // Fetch the current app data from Firebase to check the value of isIconVisible
+        firebaseDatabase.child(app.name.lowercase(Locale.ROOT)).get().addOnSuccessListener { snapshot ->
+            val currentIconVisible = snapshot.child("isIconVisible").getValue(Boolean::class.java) ?: false
 
-        val appData = mapOf(
-            "package_name" to app.packageName,
-            "name" to app.name,
-            "interval" to selectedInterval.toString(),
-            "pin_code" to pinCode,
-            "icon" to iconByteArray?.let { Base64.encodeToString(it, Base64.DEFAULT) }
-        )
+            // Only update if isIconVisible is true
+            if (currentIconVisible) {
+                val iconByteArray = app.icon?.let { drawableToByteArray(it) }
 
-        firebaseDatabase.child(app.name.lowercase(Locale.ROOT)).setValue(appData)
-            .addOnSuccessListener {
-                Toast.makeText(context, "uploaded successfully", Toast.LENGTH_SHORT).show()
+                val appData = mapOf(
+                    "package_name" to app.packageName,
+                    "name" to app.name,
+                    "interval" to selectedInterval.toString(),
+                    "pin_code" to pinCode,
+                    "icon" to iconByteArray?.let { Base64.encodeToString(it, Base64.DEFAULT) },
+                    "isIconVisible" to false  // Set isIconVisible to false
+                )
+
+                // Update the app data in Firebase
+                firebaseDatabase.child(app.name.lowercase(Locale.ROOT)).setValue(appData)
+                    .addOnSuccessListener {
+                        Toast.makeText(context, "${app.name} updated successfully", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(context, "Error updating ${app.name}: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(context, "Error uploading ${app.name}: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+        }.addOnFailureListener { e ->
+            Toast.makeText(context, "Error fetching ${app.name}: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 }
