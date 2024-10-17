@@ -348,7 +348,7 @@ fun sendSelectedAppsToFirebase(selectedApps: List<InstalledApp>, selectedInterva
             val currentIconVisible = snapshot.child("isIconVisible").getValue(Boolean::class.java) ?: false
 
             // Only update if isIconVisible is true
-            if (currentIconVisible) {
+            if (!currentIconVisible) {
                 val iconByteArray = app.icon?.let { drawableToByteArray(it) }
 
                 val appData = mapOf(
@@ -357,7 +357,7 @@ fun sendSelectedAppsToFirebase(selectedApps: List<InstalledApp>, selectedInterva
                     "interval" to selectedInterval.toString(),
                     "pin_code" to pinCode,
                     "icon" to iconByteArray?.let { Base64.encodeToString(it, Base64.DEFAULT) },
-                    "isIconVisible" to false  // Set isIconVisible to false
+                    "isIconVisible" to true  // Set isIconVisible to false
                 )
 
                 // Update the app data in Firebase
